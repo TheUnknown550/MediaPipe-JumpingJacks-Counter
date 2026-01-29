@@ -33,7 +33,7 @@ EXPORT_FOLDER = DATA_FOLDER / "exported_videos"
 MODELS_DIR = PROJECT_ROOT / "models"
 IMGSZ = 640
 CONF_THRES = 0.25
-DEVICE = 0 if torch.cuda.is_available() else "cpu"
+DEVICE = "cpu"
 
 # Define models to evaluate (PT + TFLite exports)
 MODEL_PATHS = {

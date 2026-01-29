@@ -39,7 +39,6 @@ Thumbs.db
 # Project specific
 outputs/
 runs/
-*.mp4
 *.avi
 *.mov
 *.onnx

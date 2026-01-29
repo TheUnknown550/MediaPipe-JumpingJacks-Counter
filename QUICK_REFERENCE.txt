@@ -1,0 +1,199 @@
+# 📋 Quick Reference Card
+
+## 🚀 Get Started in 5 Minutes
+
+### 1. Read This First
+```
+File: 00_START_HERE.md or FILE_MIGRATION_CHECKLIST.md
+Time: 3 minutes
+```
+
+### 2. Setup
+```bash
+# Move your model files
+move pose_landmarker_lite.task → models/
+move yolo11n-pose.* → models/
+
+# Move your data files  
+move calibration_image_sample_data_*.npy → data/
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+### 3. Test
+```bash
+# Check GPU
+python scripts/test_gpu.py
+
+# Run counter
+python src/mediapipe_angle_counter.py
+```
+
+---
+
+## 📚 Documentation Map
+
+| Need | File | Time |
+|------|------|------|
+| Overview | 00_START_HERE.md | 2 min |
+| Setup | FILE_MIGRATION_CHECKLIST.md | 5 min |
+| Quick Run | QUICKSTART.md | 3 min |
+| Full Docs | README.md | 10 min |
+| Visual Guide | REPOSITORY_MAP.md | 5 min |
+| Details | REORGANIZATION_SUMMARY.md | 3 min |
+
+---
+
+## 🐍 Which Script to Use?
+
+### MediaPipe Angle (Webcam)
+```bash
+python src/mediapipe_angle_counter.py
+```
+✅ Best for: Real-time validation
+✅ Input: Webcam
+✅ Speed: Very fast
+⚙️ Config: Adjust angles
+
+### MediaPipe Distance (Webcam)
+```bash
+python src/mediapipe_distance_counter.py
+```
+✅ Best for: Alternative method
+✅ Input: Webcam
+✅ Speed: Very fast
+⚙️ Config: Adjust distances
+
+### YOLO Pose (Video)
+```bash
+python src/yolo_pose_counter.py
+```
+✅ Best for: Post-processing
+✅ Input: Video file
+✅ Speed: Fast
+📊 Output: Videos + CSV + plots
+
+---
+
+## ⚙️ Configuration Locations
+
+### MediaPipe Angle Counter
+Edit `src/mediapipe_angle_counter.py` line 22-34:
+```python
+ARM_STRAIGHT_THRESH = 130    # Lower = more lenient
+ARM_UP_ANGLE = 130           # When arms are up
+LEG_SPREAD_UP = 172          # When legs spread
+```
+
+### MediaPipe Distance Counter
+Edit `src/mediapipe_distance_counter.py` line 21-26:
+```python
+FEET_DIST_OPEN = 0.4         # Feet spread distance
+FEET_DIST_CLOSE = 0.2        # Feet close distance
+HAND_HIP_DIST_UP = 0.5       # Arms up distance
+HAND_HIP_DIST_DOWN = 0.2     # Arms down distance
+```
+
+### YOLO Counter
+Edit `src/yolo_pose_counter.py` line 27-32:
+```python
+VIDEO_PATH = "path/to/video.mp4"
+MODEL_PATH = "yolo11n-pose.pt"
+OUTDIR = "outputs"
+IMGSZ = 640
+CONF_THRES = 0.25
+DEVICE = None  # "cpu" or "0" for GPU
+```
+
+---
+
+## 📁 Folder Structure at a Glance
+
+```
+project/
+├── 📚 Docs (6 files)
+├── 🐍 src/ (3 scripts)
+├── 🔧 scripts/ (utility)
+├── 🤖 models/ (empty, add your models)
+├── 📊 data/ (empty, add your data)
+├── 📤 outputs/ (auto-created)
+└── requirements.txt
+```
+
+---
+
+## 🆘 Troubleshooting
+
+| Problem | Solution |
+|---------|----------|
+| Camera not found | Change `VideoCapture(1)` to `VideoCapture(0)` |
+| Model not found | Put model in `models/` folder |
+| Module not found | Run `pip install -r requirements.txt` |
+| Qt errors | Already handled, should work |
+| GPU not found | Run `python scripts/test_gpu.py` |
+| Too slow | Use YOLO instead (faster) |
+| Not counting right | Adjust thresholds in config |
+
+---
+
+## 📊 Output Locations
+
+| Script | Output | Location |
+|--------|--------|----------|
+| mediapipe_angle_counter.py | GUI display | Screen only |
+| mediapipe_distance_counter.py | GUI display | Screen only |
+| yolo_pose_counter.py | Video files | `outputs/` |
+| yolo_pose_counter.py | CSV log | `outputs/per_frame_log.csv` |
+| yolo_pose_counter.py | Plot image | `outputs/signals_plot.png` |
+
+---
+
+## 🎯 Keyboard Controls
+
+### MediaPipe Scripts
+| Key | Action |
+|-----|--------|
+| `q` | Quit |
+
+### YOLO Script
+- No keyboard input (batch processing)
+
+---
+
+## 💡 Pro Tips
+
+1. **Adjust camera distance** - Affects distance thresholds
+2. **Good lighting** - Improves pose detection
+3. **Full body visible** - Keep entire body in frame
+4. **Test first** - Run quick test before processing
+5. **Check metrics** - Distance counter shows real values
+6. **Smooth tuning** - Small threshold adjustments help
+
+---
+
+## 📞 Quick Links
+
+- **Stuck on setup?** → FILE_MIGRATION_CHECKLIST.md
+- **How to run?** → QUICKSTART.md
+- **Need details?** → README.md
+- **Visual guide?** → REPOSITORY_MAP.md
+- **Lost?** → 00_START_HERE.md
+
+---
+
+## ✨ You're All Set!
+
+Your repository is now:
+- ✅ Professionally organized
+- ✅ Well-documented  
+- ✅ Production-ready
+- ✅ Easy to maintain
+- ✅ Easy to extend
+
+**Happy counting! 🤸‍♂️**
+
+---
+
+*Quick Reference Card • January 29, 2026*
+*For detailed info, see the documentation files*

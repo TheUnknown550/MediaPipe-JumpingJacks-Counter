@@ -20,9 +20,9 @@ from ultralytics import YOLO
 BASE_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = BASE_DIR.parent
 MODEL_PATHS = {
-    "YOLO11n-Pose (PT)": PROJECT_ROOT / "models" / "yolo11n-pose.pt",
-    "YOLO11n-Pose Float16 (TFLite)": PROJECT_ROOT / "models" / "yolo11n-pose_float16.tflite",
-    "YOLO11n-Pose Int8 (TFLite)": PROJECT_ROOT / "models" / "yolo11n-pose_int8.tflite",
+    "YOLO11n-Pose (PT)": PROJECT_ROOT / "models" / "tflite_models" / "no-pruning" / "yolo11n-pose_float32.tflite",
+    "YOLO11n-Pose Float16 (TFLite)": PROJECT_ROOT / "models" / "tflite_models" / "25pruning" / "yolo11n-pose-pruned-25_float32.tflite",
+    "YOLO11n-Pose Int8 (TFLite)": PROJECT_ROOT / "models" / "tflite_models" / "25pruning" / "yolo11n-pose-pruned-25_int8.tflite",
 }
 
 DEVICE = 0 if torch.cuda.is_available() else "cpu"

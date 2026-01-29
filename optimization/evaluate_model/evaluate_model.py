@@ -19,27 +19,85 @@ import torch
 import numpy as np
 import pandas as pd
 import time
+from datetime import datetime
 from pathlib import Path
 from collections import deque
 from ultralytics import YOLO
 import matplotlib.pyplot as plt
 
 # Paths & configuration
-BASE_DIR = Path(__file__).resolve().parent
-PROJECT_ROOT = BASE_DIR.parent
+BASE_DIR = Path(__file__).resolve().parent  # optimization/evaluate_model
+# Project root = repo root (two levels up from this file)
+PROJECT_ROOT = BASE_DIR.parent.parent
 DATA_FOLDER = PROJECT_ROOT / "data"
 GROUND_TRUTH_CSV = DATA_FOLDER / "ground_truth.csv"
-EXPORT_FOLDER = DATA_FOLDER / "exported_videos"
+RUN_ID = datetime.now().strftime("%Y%m%d-%H%M%S")
+OUTPUT_ROOT = PROJECT_ROOT / "outputs" / f"evaluation_{RUN_ID}"
+# Categorized export folders
+EXPORT_FOLDER = OUTPUT_ROOT / "videos"       # annotated videos
+FIGURES_FOLDER = OUTPUT_ROOT / "figures"     # png charts
+TABLES_FOLDER = OUTPUT_ROOT / "tables"       # csv / tabular artifacts
 MODELS_DIR = PROJECT_ROOT / "models"
+PT_MODELS_DIR = MODELS_DIR / "pt_models"
+TFLITE_MODELS_DIR = MODELS_DIR / "tflite_models"
 IMGSZ = 640
 CONF_THRES = 0.25
 DEVICE = "cpu"
 
+
+def _model_subfolder(model_name: str) -> str:
+    """Return a tidy folder name for a given model display name."""
+    name = model_name.lower()
+    if "(pt)" in name:
+        if "pruned 75" in name:
+            return "pruned75_pt"
+        if "pruned 50" in name:
+            return "pruned50_pt"
+        if "pruned 25" in name:
+            return "pruned25_pt"
+        return "unpruned_pt"
+    if "(tflite" in name:
+        if "75% pruning" in name:
+            return "pruned75_tflite"
+        if "50% pruning" in name:
+            return "pruned50_tflite"
+        if "25% pruning" in name:
+            return "pruned25_tflite"
+        if "no pruning" in name:
+            return "unpruned_tflite"
+    # fallback slug
+    return (
+        name.replace(" ", "_")
+        .replace("%", "pct")
+        .replace("|", "")
+        .replace("(", "")
+        .replace(")", "")
+    )
+
+
 # Define models to evaluate (PT + TFLite exports)
 MODEL_PATHS = {
-    "YOLO11n-Pose (PT)": PROJECT_ROOT / "optimization" / "yolo11n-pose.pt",
-    "YOLO11n-Pose Float16 (TFLite)": MODELS_DIR / "yolo11n-pose_float16.tflite",
-    "YOLO11n-Pose Int8 (TFLite)": MODELS_DIR / "yolo11n-pose_int8.tflite",
+    # PyTorch checkpoints
+    "YOLO11n-Pose (PT)": PT_MODELS_DIR / "yolo11n-pose.pt",
+    "YOLO11n-Pose Pruned 25% (PT)": PT_MODELS_DIR / "yolo11n-pose-pruned-25.pt",
+    "YOLO11n-Pose Pruned 50% (PT)": PT_MODELS_DIR / "yolo11n-pose-pruned-50.pt",
+    "YOLO11n-Pose Pruned 75% (PT)": PT_MODELS_DIR / "yolo11n-pose-pruned-75.pt",
+    # TFLite exports (no pruning)
+    "YOLO11n-Pose Float32 (TFLite | no pruning)": TFLITE_MODELS_DIR / "no-pruning" / "yolo11n-pose_float32.tflite",
+    "YOLO11n-Pose Float16 (TFLite | no pruning)": TFLITE_MODELS_DIR / "no-pruning" / "yolo11n-pose_float16.tflite",
+    "YOLO11n-Pose Int8 (TFLite | no pruning)": TFLITE_MODELS_DIR / "no-pruning" / "yolo11n-pose_int8.tflite",
+    # TFLite exports (25% pruning)
+    "YOLO11n-Pose Float32 (TFLite | 25% pruning)": TFLITE_MODELS_DIR / "25pruning" / "yolo11n-pose-pruned-25_float32.tflite",
+    "YOLO11n-Pose Float16 (TFLite | 25% pruning)": TFLITE_MODELS_DIR / "25pruning" / "yolo11n-pose-pruned-25_float16.tflite",
+    "YOLO11n-Pose Int8 (TFLite | 25% pruning)": TFLITE_MODELS_DIR / "25pruning" / "yolo11n-pose-pruned-25_int8.tflite",
+    # TFLite exports (50% pruning)
+    "YOLO11n-Pose Float32 (TFLite | 50% pruning)": TFLITE_MODELS_DIR / "50pruning" / "yolo11n-pose-pruned-50_float32.tflite",
+    "YOLO11n-Pose Float16 (TFLite | 50% pruning)": TFLITE_MODELS_DIR / "50pruning" / "yolo11n-pose-pruned-50_float16.tflite",
+    "YOLO11n-Pose Int8 (TFLite | 50% pruning)": TFLITE_MODELS_DIR / "50pruning" / "yolo11n-pose-pruned-50_int8.tflite",
+    # TFLite exports (75% pruning)
+    "YOLO11n-Pose Float32 (TFLite | 75% pruning)": TFLITE_MODELS_DIR / "75pruning" / "yolo11n-pose-pruned-75_float32.tflite",
+    "YOLO11n-Pose Float16 (TFLite | 75% pruning)": TFLITE_MODELS_DIR / "75pruning" / "yolo11n-pose-pruned-75_float16.tflite",
+    "YOLO11n-Pose Int8 (TFLite | 75% pruning)": TFLITE_MODELS_DIR / "75pruning" / "yolo11n-pose-pruned-75_int8.tflite",
 }
 
 # COCO-17 KEYPOINTS MAPPING (from yolo_pose_counter.py)
@@ -128,8 +186,10 @@ class JumpingJackEvaluator:
         self.results = {}
         self.ground_truth = self._load_ground_truth()
         
-        # Create export folder if it doesn't exist
+        # Create categorized export folders
         EXPORT_FOLDER.mkdir(parents=True, exist_ok=True)
+        FIGURES_FOLDER.mkdir(parents=True, exist_ok=True)
+        TABLES_FOLDER.mkdir(parents=True, exist_ok=True)
     
     def _load_ground_truth(self):
         """Load ground truth data from CSV"""
@@ -216,7 +276,7 @@ class JumpingJackEvaluator:
                 "infer_time": jj_stats["infer_time"]
             }
             
-            print(f"  → Predicted: {predicted_count} JJs")
+            print(f"  ✅ Predicted: {predicted_count} JJs")
         
         if not predictions:
             print("❌ No predictions made")
@@ -255,10 +315,12 @@ class JumpingJackEvaluator:
             frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
             fps = cap.get(cv2.CAP_PROP_FPS) or 30
             
-            # Create output video writer
+            # Create output video writer (per-model subfolder)
+            model_folder = EXPORT_FOLDER / _model_subfolder(model_name)
+            model_folder.mkdir(parents=True, exist_ok=True)
             model_name_safe = model_name.replace(" ", "_").replace("(", "").replace(")", "")
             video_name_without_ext = Path(video_file).stem
-            output_path = EXPORT_FOLDER / f"{video_name_without_ext}_{model_name_safe}.mp4"
+            output_path = model_folder / f"{video_name_without_ext}_{model_name_safe}.mp4"
             
             fourcc = cv2.VideoWriter_fourcc(*'mp4v')
             out = cv2.VideoWriter(str(output_path), fourcc, fps, (frame_width, frame_height))
@@ -495,7 +557,7 @@ class JumpingJackEvaluator:
     
     def save_results_csv(self, output_file="evaluation_results.csv"):
         """Save detailed results to CSV"""
-        output_path = Path(self.ground_truth_csv).parent / output_file
+        output_path = TABLES_FOLDER / output_file
         
         rows = []
         for model_name, data in self.results.items():
@@ -610,7 +672,7 @@ class JumpingJackEvaluator:
         axes[1, 2].set_title('Parameter Count')
 
         plt.tight_layout()
-        summary_path = Path(self.ground_truth_csv).parent / 'evaluation_results.png'
+        summary_path = FIGURES_FOLDER / 'evaluation_results.png'
         plt.savefig(summary_path, dpi=300)
         print(f"✅ Summary plot saved to {summary_path}")
 
@@ -630,7 +692,7 @@ class JumpingJackEvaluator:
             for (i, j), val in np.ndenumerate(matrix):
                 ax_cm[idx].text(j, i, f"{val}", ha='center', va='center', color='black', fontsize=12)
         plt.tight_layout()
-        cm_path = Path(self.ground_truth_csv).parent / 'confusion_matrices.png'
+        cm_path = FIGURES_FOLDER / 'confusion_matrices.png'
         plt.savefig(cm_path, dpi=300)
         print(f"✅ Confusion matrices saved to {cm_path}")
         plt.show()
@@ -654,7 +716,12 @@ def main():
     evaluator.print_results()
     evaluator.save_results_csv()
     evaluator.plot_results()
-    
+
+    print("\nArtifacts saved to:")
+    print(f"  Videos   : {EXPORT_FOLDER}")
+    print(f"  Figures  : {FIGURES_FOLDER}")
+    print(f"  Tables   : {TABLES_FOLDER}")
+    print(f"  Run ID   : {RUN_ID}")
     print("\n✅ Evaluation complete!")
 
 

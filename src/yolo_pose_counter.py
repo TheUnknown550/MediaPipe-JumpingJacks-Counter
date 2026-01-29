@@ -32,7 +32,7 @@ from ultralytics import YOLO
 
 # --- CONFIGURATION ---
 # Update these paths for your system
-VIDEO_PATH = "path/to/your/video.mp4"  # Update this path
+VIDEO_PATH = "data/7.mp4"  # Update this path
 MODEL_PATH = "yolo11n-pose.pt"          # Will auto-download if not found
 OUTDIR = "outputs"                      # Output directory
 

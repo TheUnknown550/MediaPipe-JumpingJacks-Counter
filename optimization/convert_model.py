@@ -19,7 +19,7 @@ def convert_to_ncnn():
     print("Converting to NCNN (FP16)...")
     try:
         model = YOLO(MODEL_PT)
-        model.export(format="ncnn", imgsz=640, half=True)
+        model.export(format="ncnn", imgsz=640, half=True, device=0)
         print("✅ NCNN conversion complete!")
         return True
     except Exception as e:
@@ -32,7 +32,7 @@ def convert_to_tflite():
     try:
         model = YOLO(MODEL_PT)
         # Note: INT8 requires calibration data - use coco8-pose.yaml as example
-        model.export(format="tflite", imgsz=640, int8=True, data="coco8-pose.yaml")
+        model.export(format="tflite", imgsz=640, int8=True, data="coco8-pose.yaml", device=0)
         print("✅ TFLite conversion complete!")
         return True
     except Exception as e:
@@ -44,7 +44,7 @@ def convert_to_onnx():
     print("\nConverting to ONNX...")
     try:
         model = YOLO(MODEL_PT)
-        model.export(format="onnx", imgsz=640)
+        model.export(format="onnx", imgsz=640, device=0)
         print("✅ ONNX conversion complete!")
         return True
     except Exception as e:

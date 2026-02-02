@@ -18,6 +18,7 @@ import cv2
 import torch
 import numpy as np
 import pandas as pd
+import re
 import time
 from datetime import datetime
 from pathlib import Path
@@ -37,6 +38,7 @@ OUTPUT_ROOT = PROJECT_ROOT / "outputs" / f"evaluation_{RUN_ID}"
 EXPORT_FOLDER = OUTPUT_ROOT / "videos"       # annotated videos
 FIGURES_FOLDER = OUTPUT_ROOT / "figures"     # png charts
 TABLES_FOLDER = OUTPUT_ROOT / "tables"       # csv / tabular artifacts
+GROUND_TRUTH_TXT_OUT = TABLES_FOLDER / "ground_truth.txt"
 MODELS_DIR = PROJECT_ROOT / "models"
 PT_MODELS_DIR = MODELS_DIR / "pt_models"
 TFLITE_MODELS_DIR = MODELS_DIR / "tflite_models"
@@ -75,29 +77,37 @@ def _model_subfolder(model_name: str) -> str:
     )
 
 
+def _safe_filename_component(text: str) -> str:
+    """Sanitize strings for filesystem-safe filename components (Windows friendly)."""
+    safe = re.sub(r'[<>:"/\\|?*]', "_", text)
+    safe = re.sub(r"\s+", "_", safe)
+    safe = re.sub(r"_+", "_", safe).strip("_.")
+    return safe or "model"
+
+
 # Define models to evaluate (PT + TFLite exports)
 MODEL_PATHS = {
     # PyTorch checkpoints
     "YOLO11n-Pose (PT)": PT_MODELS_DIR / "yolo11n-pose.pt",
-    "YOLO11n-Pose Pruned 25% (PT)": PT_MODELS_DIR / "yolo11n-pose-pruned-25.pt",
-    "YOLO11n-Pose Pruned 50% (PT)": PT_MODELS_DIR / "yolo11n-pose-pruned-50.pt",
-    "YOLO11n-Pose Pruned 75% (PT)": PT_MODELS_DIR / "yolo11n-pose-pruned-75.pt",
+    # "YOLO11n-Pose Pruned 25% (PT)": PT_MODELS_DIR / "yolo11n-pose-pruned-25.pt",
+    # "YOLO11n-Pose Pruned 50% (PT)": PT_MODELS_DIR / "yolo11n-pose-pruned-50.pt",
+    # "YOLO11n-Pose Pruned 75% (PT)": PT_MODELS_DIR / "yolo11n-pose-pruned-75.pt",
     # TFLite exports (no pruning)
     "YOLO11n-Pose Float32 (TFLite | no pruning)": TFLITE_MODELS_DIR / "no-pruning" / "yolo11n-pose_float32.tflite",
     "YOLO11n-Pose Float16 (TFLite | no pruning)": TFLITE_MODELS_DIR / "no-pruning" / "yolo11n-pose_float16.tflite",
     "YOLO11n-Pose Int8 (TFLite | no pruning)": TFLITE_MODELS_DIR / "no-pruning" / "yolo11n-pose_int8.tflite",
-    # TFLite exports (25% pruning)
-    "YOLO11n-Pose Float32 (TFLite | 25% pruning)": TFLITE_MODELS_DIR / "25pruning" / "yolo11n-pose-pruned-25_float32.tflite",
-    "YOLO11n-Pose Float16 (TFLite | 25% pruning)": TFLITE_MODELS_DIR / "25pruning" / "yolo11n-pose-pruned-25_float16.tflite",
-    "YOLO11n-Pose Int8 (TFLite | 25% pruning)": TFLITE_MODELS_DIR / "25pruning" / "yolo11n-pose-pruned-25_int8.tflite",
-    # TFLite exports (50% pruning)
-    "YOLO11n-Pose Float32 (TFLite | 50% pruning)": TFLITE_MODELS_DIR / "50pruning" / "yolo11n-pose-pruned-50_float32.tflite",
-    "YOLO11n-Pose Float16 (TFLite | 50% pruning)": TFLITE_MODELS_DIR / "50pruning" / "yolo11n-pose-pruned-50_float16.tflite",
-    "YOLO11n-Pose Int8 (TFLite | 50% pruning)": TFLITE_MODELS_DIR / "50pruning" / "yolo11n-pose-pruned-50_int8.tflite",
-    # TFLite exports (75% pruning)
-    "YOLO11n-Pose Float32 (TFLite | 75% pruning)": TFLITE_MODELS_DIR / "75pruning" / "yolo11n-pose-pruned-75_float32.tflite",
-    "YOLO11n-Pose Float16 (TFLite | 75% pruning)": TFLITE_MODELS_DIR / "75pruning" / "yolo11n-pose-pruned-75_float16.tflite",
-    "YOLO11n-Pose Int8 (TFLite | 75% pruning)": TFLITE_MODELS_DIR / "75pruning" / "yolo11n-pose-pruned-75_int8.tflite",
+    # # TFLite exports (25% pruning)
+    # "YOLO11n-Pose Float32 (TFLite | 25% pruning)": TFLITE_MODELS_DIR / "25pruning" / "yolo11n-pose-pruned-25_float32.tflite",
+    # "YOLO11n-Pose Float16 (TFLite | 25% pruning)": TFLITE_MODELS_DIR / "25pruning" / "yolo11n-pose-pruned-25_float16.tflite",
+    # "YOLO11n-Pose Int8 (TFLite | 25% pruning)": TFLITE_MODELS_DIR / "25pruning" / "yolo11n-pose-pruned-25_int8.tflite",
+    # # TFLite exports (50% pruning)
+    # "YOLO11n-Pose Float32 (TFLite | 50% pruning)": TFLITE_MODELS_DIR / "50pruning" / "yolo11n-pose-pruned-50_float32.tflite",
+    # "YOLO11n-Pose Float16 (TFLite | 50% pruning)": TFLITE_MODELS_DIR / "50pruning" / "yolo11n-pose-pruned-50_float16.tflite",
+    # "YOLO11n-Pose Int8 (TFLite | 50% pruning)": TFLITE_MODELS_DIR / "50pruning" / "yolo11n-pose-pruned-50_int8.tflite",
+    # # TFLite exports (75% pruning)
+    # "YOLO11n-Pose Float32 (TFLite | 75% pruning)": TFLITE_MODELS_DIR / "75pruning" / "yolo11n-pose-pruned-75_float32.tflite",
+    # "YOLO11n-Pose Float16 (TFLite | 75% pruning)": TFLITE_MODELS_DIR / "75pruning" / "yolo11n-pose-pruned-75_float16.tflite",
+    # "YOLO11n-Pose Int8 (TFLite | 75% pruning)": TFLITE_MODELS_DIR / "75pruning" / "yolo11n-pose-pruned-75_int8.tflite",
 }
 
 # COCO-17 KEYPOINTS MAPPING (from yolo_pose_counter.py)
@@ -190,6 +200,7 @@ class JumpingJackEvaluator:
         EXPORT_FOLDER.mkdir(parents=True, exist_ok=True)
         FIGURES_FOLDER.mkdir(parents=True, exist_ok=True)
         TABLES_FOLDER.mkdir(parents=True, exist_ok=True)
+        self._export_ground_truth_txt()
     
     def _load_ground_truth(self):
         """Load ground truth data from CSV"""
@@ -293,6 +304,7 @@ class JumpingJackEvaluator:
             "predictions": predictions,
             "metrics": metrics
         }
+        self._save_predictions_txt(model_name, predictions)
         
         return metrics
     
@@ -318,12 +330,15 @@ class JumpingJackEvaluator:
             # Create output video writer (per-model subfolder)
             model_folder = EXPORT_FOLDER / _model_subfolder(model_name)
             model_folder.mkdir(parents=True, exist_ok=True)
-            model_name_safe = model_name.replace(" ", "_").replace("(", "").replace(")", "")
-            video_name_without_ext = Path(video_file).stem
+            model_name_safe = _safe_filename_component(model_name)
+            video_name_without_ext = _safe_filename_component(Path(video_file).stem)
             output_path = model_folder / f"{video_name_without_ext}_{model_name_safe}.mp4"
             
             fourcc = cv2.VideoWriter_fourcc(*'mp4v')
             out = cv2.VideoWriter(str(output_path), fourcc, fps, (frame_width, frame_height))
+            if not out.isOpened():
+                print(f"    ❌ Could not create video writer at {output_path}; continuing without export.")
+                out = None
             
             # Initialize counter and timing
             counter = JumpingJackCounter()
@@ -390,13 +405,16 @@ class JumpingJackEvaluator:
                 cv2.putText(overlay, f"Frame: {frame_id}", (30, 160),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
                 
-                out.write(overlay)
+                if out:
+                    out.write(overlay)
                 frame_id += 1
             
             cap.release()
-            out.release()
-            
-            print(f"    ✅ Exported video to: {output_path}")
+            if out:
+                out.release()
+                print(f"    ✅ Exported video to: {output_path}")
+            else:
+                print("    ⚠️ Skipped video export for this run (writer unavailable).")
             
             return {
                 "count": counter.count,
@@ -409,6 +427,25 @@ class JumpingJackEvaluator:
             import traceback
             traceback.print_exc()
             return {"count": 0, "frames": 0, "infer_time": 0.0}
+
+    def _export_ground_truth_txt(self):
+        """Save ground truth in the requested TXT format (Video,Counts)."""
+        if not self.ground_truth:
+            return
+        lines = ["Video,Counts\n"]
+        for video, count in sorted(self.ground_truth.items()):
+            lines.append(f"{Path(video).stem},{count}\n")
+        GROUND_TRUTH_TXT_OUT.write_text("".join(lines))
+        print(f"✅ Ground truth snapshot saved to {GROUND_TRUTH_TXT_OUT}")
+
+    def _save_predictions_txt(self, model_name, predictions):
+        """Save per-model predictions to TXT (Video,Counts)."""
+        path = TABLES_FOLDER / f"{_model_subfolder(model_name)}_predictions.txt"
+        lines = ["Video,Counts\n"]
+        for video, data in sorted(predictions.items()):
+            lines.append(f"{Path(video).stem},{data['predicted']}\n")
+        path.write_text("".join(lines))
+        print(f"✅ Predictions saved to {path}")
     
     def _calculate_metrics(self, predictions, total_frames, total_infer_time, model_path, model_obj):
         """Calculate evaluation metrics and performance stats"""
@@ -421,6 +458,7 @@ class JumpingJackEvaluator:
             "fpr": 0,
             "mae": 0,
             "rmse": 0,
+            "bias": 0,
             "samples": len(predictions),
             "fps": 0,
             "latency_ms": 0,
@@ -436,12 +474,14 @@ class JumpingJackEvaluator:
         false_positives = 0
         false_negatives = 0
         errors = []
+        signed_errors = []
         
         for video_file, data in predictions.items():
             correct = data["correct"]
             predicted = data["predicted"]
             
             errors.append(abs(correct - predicted))
+            signed_errors.append(predicted - correct)
             
             # Accuracy: exact match
             if correct == predicted:
@@ -463,6 +503,7 @@ class JumpingJackEvaluator:
         metrics["accuracy"] = (correct_predictions / len(predictions)) * 100 if predictions else 0
         metrics["mae"] = np.mean(errors) if errors else 0
         metrics["rmse"] = np.sqrt(np.mean(np.array(errors)**2)) if errors else 0
+        metrics["bias"] = float(np.mean(signed_errors)) if signed_errors else 0
         
         # Precision: TP / (TP + FP)
         if (true_positives + false_positives) > 0:
@@ -530,6 +571,7 @@ class JumpingJackEvaluator:
             f"{'F1%':>8}"
             f"{'MAE':>7}"
             f"{'RMSE':>7}"
+            f"{'Bias':>7}"
         )
         print(header)
         print("-" * len(header))
@@ -550,15 +592,16 @@ class JumpingJackEvaluator:
                 f"{m['f1']:>8.1f}"
                 f"{m['mae']:>7.2f}"
                 f"{m['rmse']:>7.2f}"
+                f"{m.get('bias',0):>7.2f}"
             )
             conf = m["confusion"]
             print(f"    Confusion Matrix (TP/FP/FN/TN): {conf['tp']}/{conf['fp']}/{conf['fn']}/{conf['tn']}")
         print("=" * len(header))
     
     def save_results_csv(self, output_file="evaluation_results.csv"):
-        """Save detailed results to CSV"""
+        """Save detailed results to CSV (per-video rows + per-model summary row)."""
         output_path = TABLES_FOLDER / output_file
-        
+
         rows = []
         for model_name, data in self.results.items():
             metrics = data["metrics"]
@@ -587,6 +630,7 @@ class JumpingJackEvaluator:
                 "f1": metrics["f1"],
                 "mae": metrics["mae"],
                 "rmse": metrics["rmse"],
+                "bias": metrics.get("bias", 0),
                 "fps": metrics["fps"],
                 "latency_ms": metrics["latency_ms"],
                 "size_mb": metrics["size_mb"],
@@ -596,12 +640,39 @@ class JumpingJackEvaluator:
                 "fn": metrics["confusion"]["fn"],
                 "tn": metrics["confusion"]["tn"],
             })
-        
+
         if rows:
+            import pandas as pd
             df = pd.DataFrame(rows)
             df.to_csv(output_path, index=False)
-            print(f"✅ Results saved to {output_path}")
-    
+            print(f"? Results saved to {output_path}")
+
+    def save_metrics_summary_csv(self, output_file="metrics_summary.csv"):
+        """Save one-row-per-model metrics for easy plotting."""
+        output_path = TABLES_FOLDER / output_file
+        rows = []
+        for model_name, data in self.results.items():
+            m = data["metrics"]
+            rows.append({
+                "model": model_name,
+                "samples": m["samples"],
+                "mae": m["mae"],
+                "rmse": m["rmse"],
+                "bias": m["bias"],
+                "accuracy_pct": m["accuracy"],
+                "precision_pct": m["precision"],
+                "recall_pct": m["recall"],
+                "f1_pct": m["f1"],
+                "fps": m["fps"],
+                "latency_ms": m["latency_ms"],
+                "size_mb": m["size_mb"],
+                "params": m["params"],
+            })
+        if rows:
+            import pandas as pd
+            pd.DataFrame(rows).to_csv(output_path, index=False)
+            print(f"? Metrics summary saved to {output_path}")
+
     def plot_results(self):
         """Create visualization of results"""
         if not self.results:
@@ -715,6 +786,7 @@ def main():
     # Print and save results
     evaluator.print_results()
     evaluator.save_results_csv()
+    evaluator.save_metrics_summary_csv()
     evaluator.plot_results()
 
     print("\nArtifacts saved to:")
